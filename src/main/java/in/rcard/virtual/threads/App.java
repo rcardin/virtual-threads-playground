@@ -1,20 +1,21 @@
 package in.rcard.virtual.threads;
 
-import jdk.incubator.concurrent.StructuredTaskScope;
+import java.time.Duration;
 
 public class App {
-  public static void main(String[] args) throws Exception {
-    try (var scope = new StructuredTaskScope<Void>()) {
-      scope.fork(() -> delayPrint(1000, "Hello,"));
-      scope.fork(() -> delayPrint(2000, "World!"));
-      scope.join();
-    }
-    System.out.println("Done!");
+  public static void main(String[] args) {
+    stackOverFlowErrorExample();
   }
 
-  private static Void delayPrint(long delay, String message) throws Exception {
-    Thread.sleep(delay);
-    System.out.println(message);
-    return null;
+  private static void stackOverFlowErrorExample() {
+    for (int i = 0; i < 100_000; i++) {
+      new Thread(() -> {
+        try {
+          Thread.sleep(Duration.ofSeconds(1L));
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }).start();
+    }
   }
 }
