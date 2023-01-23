@@ -54,8 +54,7 @@ public class App {
   @SneakyThrows
   static void concurrentMorningRoutineUsingExecutorsWithName() {
     final ThreadFactory factory = Thread.ofVirtual().name("routine-", 0).factory();
-    try (var executor =
-        Executors.newThreadPerTaskExecutor(factory)) {
+    try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
       var f1 =
           executor.submit(
               () -> {
@@ -92,6 +91,29 @@ public class App {
           logger.info("I'm going to boil some water");
           sleep(Duration.ofSeconds(1L));
           logger.info("I'm done with the water");
+        });
+  }
+
+  static Thread workingHard() {
+    return virtualThread(
+        "Working hard",
+        () -> {
+          logger.info("I'm working hard");
+          while (true) {
+            // Do nothing
+          }
+          sleep(Duration.ofMillis(100L));
+          logger.info("I'm done with working hard");
+        });
+  }
+  
+  static Thread takeABreak() {
+    return virtualThread(
+        "Take a break",
+        () -> {
+          logger.info("I'm going to take a break");
+          sleep(Duration.ofSeconds(1L));
+          logger.info("I'm done with the break");
         });
   }
 
