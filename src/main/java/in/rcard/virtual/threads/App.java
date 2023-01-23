@@ -2,6 +2,7 @@ package in.rcard.virtual.threads;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +12,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    concurrentMorningRoutineUsingExecutors();
+    concurrentMorningRoutineUsingExecutorsWithName();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -31,6 +32,30 @@ public class App {
   @SneakyThrows
   static void concurrentMorningRoutineUsingExecutors() {
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      var f1 =
+          executor.submit(
+              () -> {
+                logger.info("I'm going to take a bath");
+                sleep(Duration.ofMillis(500L));
+                logger.info("I'm done with the bath");
+              });
+      var f2 =
+          executor.submit(
+              () -> {
+                logger.info("I'm going to boil some water");
+                sleep(Duration.ofSeconds(1L));
+                logger.info("I'm done with the water");
+              });
+      f1.get();
+      f2.get();
+    }
+  }
+
+  @SneakyThrows
+  static void concurrentMorningRoutineUsingExecutorsWithName() {
+    final ThreadFactory factory = Thread.ofVirtual().name("routine-", 0).factory();
+    try (var executor =
+        Executors.newThreadPerTaskExecutor(factory)) {
       var f1 =
           executor.submit(
               () -> {
