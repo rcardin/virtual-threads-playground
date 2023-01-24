@@ -12,7 +12,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    concurrentMorningRoutineUsingExecutorsWithName();
+    workingConsciousnessRoutine();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -93,18 +93,50 @@ public class App {
           logger.info("I'm done with the water");
         });
   }
+  
+  @SneakyThrows
+  static void workingHardRoutine() {
+    final Thread vt1 = workingHard();
+    final Thread vt2 = takeABreak();
+    vt1.join();
+    vt2.join();
+  }
+  
+  @SneakyThrows
+  static void workingConsciousnessRoutine() {
+    final Thread vt1 = workingConsciousness();
+    final Thread vt2 = takeABreak();
+    vt1.join();
+    vt2.join();
+  }
 
   static Thread workingHard() {
     return virtualThread(
         "Working hard",
         () -> {
           logger.info("I'm working hard");
-          while (true) {
+          while (alwaysTrue()) {
             // Do nothing
           }
           sleep(Duration.ofMillis(100L));
           logger.info("I'm done with working hard");
         });
+  }
+  
+  static Thread workingConsciousness() {
+    return virtualThread(
+        "Working hard",
+        () -> {
+          logger.info("I'm working hard");
+          while (alwaysTrue()) {
+            sleep(Duration.ofMillis(100L));
+          }
+          logger.info("I'm done with working hard");
+        });
+  }
+  
+  static boolean alwaysTrue() {
+    return true;
   }
   
   static Thread takeABreak() {
@@ -116,7 +148,6 @@ public class App {
           logger.info("I'm done with the break");
         });
   }
-
   @SneakyThrows
   private static void sleep(Duration duration) {
     Thread.sleep(duration);
