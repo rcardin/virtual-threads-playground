@@ -125,7 +125,7 @@ public class App {
   
   static Thread workingConsciousness() {
     return virtualThread(
-        "Working hard",
+        "Working consciousness",
         () -> {
           logger.info("I'm working hard");
           while (alwaysTrue()) {
