@@ -12,7 +12,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    workingConsciousnessRoutine();
+    twoEmployeesInTheOffice();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -148,6 +148,31 @@ public class App {
           logger.info("I'm done with the break");
         });
   }
+  
+  @SneakyThrows
+  static void twoEmployeesInTheOffice() {
+    var riccardo = goToTheToilet();
+    var daniel = takeABreak();
+    riccardo.join();
+    daniel.join();
+  }
+  
+  static Bathroom bathroom = new Bathroom();
+  
+  static Thread goToTheToilet() {
+    return virtualThread(
+        "Go to the toilet",
+        () -> bathroom.useTheToilet());
+  }
+  
+  static class Bathroom {
+    synchronized void useTheToilet() {
+      logger.info("I'm going to use the toilet");
+      sleep(Duration.ofSeconds(1L));
+      logger.info("I'm done with the toilet");
+    }
+  }
+  
   @SneakyThrows
   private static void sleep(Duration duration) {
     Thread.sleep(duration);
