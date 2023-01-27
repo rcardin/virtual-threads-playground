@@ -15,7 +15,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    twoEmployeesInTheOfficeWithLock();
+    concurrentMorningRoutineUsingExecutorsWithName();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -61,16 +61,16 @@ public class App {
       var f1 =
           executor.submit(
               () -> {
-                logger.info("I'm going to take a bath");
+                log("I'm going to take a bath");
                 sleep(Duration.ofMillis(500L));
-                logger.info("I'm done with the bath");
+                log("I'm done with the bath");
               });
       var f2 =
           executor.submit(
               () -> {
-                logger.info("I'm going to boil some water");
+                log("I'm going to boil some water");
                 sleep(Duration.ofSeconds(1L));
-                logger.info("I'm done with the water");
+                log("I'm done with the water");
               });
       f1.get();
       f2.get();
@@ -203,11 +203,15 @@ public class App {
   }
 
   @SneakyThrows
-  private static void sleep(Duration duration) {
+  static void sleep(Duration duration) {
     Thread.sleep(duration);
   }
 
-  private static Thread virtualThread(String name, Runnable runnable) {
+  static Thread virtualThread(String name, Runnable runnable) {
     return Thread.ofVirtual().name(name).start(runnable);
+  }
+  
+  static void log(String message) {
+    logger.info("{} | " + message, Thread.currentThread());
   }
 }
