@@ -3,6 +3,9 @@ package in.rcard.virtual.threads;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +15,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    twoEmployeesInTheOffice();
+    twoEmployeesInTheOfficeWithLock();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -93,7 +96,7 @@ public class App {
           logger.info("I'm done with the water");
         });
   }
-  
+
   @SneakyThrows
   static void workingHardRoutine() {
     final Thread vt1 = workingHard();
@@ -101,7 +104,7 @@ public class App {
     vt1.join();
     vt2.join();
   }
-  
+
   @SneakyThrows
   static void workingConsciousnessRoutine() {
     final Thread vt1 = workingConsciousness();
@@ -122,7 +125,7 @@ public class App {
           logger.info("I'm done with working hard");
         });
   }
-  
+
   static Thread workingConsciousness() {
     return virtualThread(
         "Working consciousness",
@@ -134,11 +137,11 @@ public class App {
           logger.info("I'm done with working hard");
         });
   }
-  
+
   static boolean alwaysTrue() {
     return true;
   }
-  
+
   static Thread takeABreak() {
     return virtualThread(
         "Take a break",
@@ -148,7 +151,7 @@ public class App {
           logger.info("I'm done with the break");
         });
   }
-  
+
   @SneakyThrows
   static void twoEmployeesInTheOffice() {
     var riccardo = goToTheToilet();
@@ -157,22 +160,48 @@ public class App {
     daniel.join();
   }
   
+  @SneakyThrows
+  static void twoEmployeesInTheOfficeWithLock() {
+    var riccardo = goToTheToiletWithLock();
+    var daniel = takeABreak();
+    riccardo.join();
+    daniel.join();
+  }
+
   static Bathroom bathroom = new Bathroom();
-  
+
   static Thread goToTheToilet() {
-    return virtualThread(
-        "Go to the toilet",
-        () -> bathroom.useTheToilet());
+    return virtualThread("Go to the toilet", () -> bathroom.useTheToilet());
+  }
+  
+  static Thread goToTheToiletWithLock() {
+    return virtualThread("Go to the toilet", () -> bathroom.useTheToiletWithLock());
   }
   
   static class Bathroom {
+
+    private final Lock lock = new ReentrantLock();
+
     synchronized void useTheToilet() {
       logger.info("I'm going to use the toilet");
       sleep(Duration.ofSeconds(1L));
       logger.info("I'm done with the toilet");
     }
+
+    @SneakyThrows
+    void useTheToiletWithLock() {
+      if (lock.tryLock(10, TimeUnit.SECONDS)) {
+        try {
+          logger.info("I'm going to use the toilet");
+          sleep(Duration.ofSeconds(1L));
+          logger.info("I'm done with the toilet");
+        } finally {
+          lock.unlock();
+        }
+      }
+    }
   }
-  
+
   @SneakyThrows
   private static void sleep(Duration duration) {
     Thread.sleep(duration);
