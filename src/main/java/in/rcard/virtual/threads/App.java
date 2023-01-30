@@ -26,31 +26,31 @@ public class App {
 
   @SneakyThrows
   static void concurrentMorningRoutine() {
-    var vt1 = bathTime();
-    var vt2 = boilingWater();
-    vt1.join();
-    vt2.join();
+    var bathTime = bathTime();
+    var boilingWater = boilingWater();
+    bathTime.join();
+    boilingWater.join();
   }
 
   @SneakyThrows
   static void concurrentMorningRoutineUsingExecutors() {
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-      var f1 =
+      var bathTime =
           executor.submit(
               () -> {
-                logger.info("I'm going to take a bath");
+                log("I'm going to take a bath");
                 sleep(Duration.ofMillis(500L));
-                logger.info("I'm done with the bath");
+                log("I'm done with the bath");
               });
-      var f2 =
+      var boilingWater =
           executor.submit(
               () -> {
-                logger.info("I'm going to boil some water");
+                log("I'm going to boil some water");
                 sleep(Duration.ofSeconds(1L));
-                logger.info("I'm done with the water");
+                log("I'm done with the water");
               });
-      f1.get();
-      f2.get();
+      bathTime.get();
+      boilingWater.get();
     }
   }
 
@@ -58,42 +58,42 @@ public class App {
   static void concurrentMorningRoutineUsingExecutorsWithName() {
     final ThreadFactory factory = Thread.ofVirtual().name("routine-", 0).factory();
     try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
-      var f1 =
+      var bathTime =
           executor.submit(
               () -> {
                 log("I'm going to take a bath");
                 sleep(Duration.ofMillis(500L));
                 log("I'm done with the bath");
               });
-      var f2 =
+      var boilingWater =
           executor.submit(
               () -> {
                 log("I'm going to boil some water");
                 sleep(Duration.ofSeconds(1L));
                 log("I'm done with the water");
               });
-      f1.get();
-      f2.get();
+      bathTime.get();
+      boilingWater.get();
     }
   }
 
   static Thread bathTime() {
     return virtualThread(
-        "Bath time",
+        "bath-time",
         () -> {
-          logger.info("I'm going to take a bath");
+          log("I'm going to take a bath");
           sleep(Duration.ofMillis(500L));
-          logger.info("I'm done with the bath");
+          log("I'm done with the bath");
         });
   }
 
   static Thread boilingWater() {
     return virtualThread(
-        "Boil some water",
+        "boilWater",
         () -> {
-          logger.info("I'm going to boil some water");
+          log("I'm going to boil some water");
           sleep(Duration.ofSeconds(1L));
-          logger.info("I'm done with the water");
+          log("I'm done with the water");
         });
   }
 
