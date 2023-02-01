@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.IntStream;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    concurrentMorningRoutineUsingExecutorsWithName();
+    viewCarrierThreadPoolSize();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -159,7 +160,7 @@ public class App {
     riccardo.join();
     daniel.join();
   }
-  
+
   @SneakyThrows
   static void twoEmployeesInTheOfficeWithLock() {
     var riccardo = goToTheToiletWithLock();
@@ -173,11 +174,11 @@ public class App {
   static Thread goToTheToilet() {
     return virtualThread("Go to the toilet", () -> bathroom.useTheToilet());
   }
-  
+
   static Thread goToTheToiletWithLock() {
     return virtualThread("Go to the toilet", () -> bathroom.useTheToiletWithLock());
   }
-  
+
   static class Bathroom {
 
     private final Lock lock = new ReentrantLock();
@@ -202,6 +203,25 @@ public class App {
     }
   }
 
+  static void viewCarrierThreadPoolSize() {
+    final ThreadFactory factory = Thread.ofVirtual().name("routine-", 0).factory();
+    try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
+      IntStream.range(0, numberOfCores() + 1)
+          .forEach(i ->
+              executor.submit(
+                  () -> {
+                    log("Hello, I'm a virtual thread number " + i);
+                    sleep(Duration.ofSeconds(1L));
+                  }
+              )
+          );
+    }
+  }
+
+  static int numberOfCores() {
+    return Runtime.getRuntime().availableProcessors();
+  }
+
   @SneakyThrows
   static void sleep(Duration duration) {
     Thread.sleep(duration);
@@ -210,7 +230,7 @@ public class App {
   static Thread virtualThread(String name, Runnable runnable) {
     return Thread.ofVirtual().name(name).start(runnable);
   }
-  
+
   static void log(String message) {
     logger.info("{} | " + message, Thread.currentThread());
   }
