@@ -16,7 +16,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    viewCarrierThreadPoolSize();
+    workingHardRoutine();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -100,30 +100,30 @@ public class App {
 
   @SneakyThrows
   static void workingHardRoutine() {
-    final Thread vt1 = workingHard();
-    final Thread vt2 = takeABreak();
-    vt1.join();
-    vt2.join();
+    var workingHard = workingHard();
+    var takeABreak = takeABreak();
+    workingHard.join();
+    takeABreak.join();
   }
 
   @SneakyThrows
   static void workingConsciousnessRoutine() {
-    final Thread vt1 = workingConsciousness();
-    final Thread vt2 = takeABreak();
-    vt1.join();
-    vt2.join();
+    var workingConsciousness = workingConsciousness();
+    var takeABreak = takeABreak();
+    workingConsciousness.join();
+    takeABreak.join();
   }
 
   static Thread workingHard() {
     return virtualThread(
         "Working hard",
         () -> {
-          logger.info("I'm working hard");
+          log("I'm working hard");
           while (alwaysTrue()) {
             // Do nothing
           }
           sleep(Duration.ofMillis(100L));
-          logger.info("I'm done with working hard");
+          log("I'm done with working hard");
         });
   }
 
@@ -131,11 +131,11 @@ public class App {
     return virtualThread(
         "Working consciousness",
         () -> {
-          logger.info("I'm working hard");
+          log("I'm working hard");
           while (alwaysTrue()) {
             sleep(Duration.ofMillis(100L));
           }
-          logger.info("I'm done with working hard");
+          log("I'm done with working hard");
         });
   }
 
@@ -147,9 +147,9 @@ public class App {
     return virtualThread(
         "Take a break",
         () -> {
-          logger.info("I'm going to take a break");
+          log("I'm going to take a break");
           sleep(Duration.ofSeconds(1L));
-          logger.info("I'm done with the break");
+          log("I'm done with the break");
         });
   }
 
@@ -207,14 +207,13 @@ public class App {
     final ThreadFactory factory = Thread.ofVirtual().name("routine-", 0).factory();
     try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
       IntStream.range(0, numberOfCores() + 1)
-          .forEach(i ->
-              executor.submit(
-                  () -> {
-                    log("Hello, I'm a virtual thread number " + i);
-                    sleep(Duration.ofSeconds(1L));
-                  }
-              )
-          );
+          .forEach(
+              i ->
+                  executor.submit(
+                      () -> {
+                        log("Hello, I'm a virtual thread number " + i);
+                        sleep(Duration.ofSeconds(1L));
+                      }));
     }
   }
 
