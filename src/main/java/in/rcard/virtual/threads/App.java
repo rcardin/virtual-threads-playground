@@ -16,7 +16,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    workingHardRoutine();
+    twoEmployeesInTheOfficeWithLock();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -184,18 +184,18 @@ public class App {
     private final Lock lock = new ReentrantLock();
 
     synchronized void useTheToilet() {
-      logger.info("I'm going to use the toilet");
+      log("I'm going to use the toilet");
       sleep(Duration.ofSeconds(1L));
-      logger.info("I'm done with the toilet");
+      log("I'm done with the toilet");
     }
 
     @SneakyThrows
     void useTheToiletWithLock() {
       if (lock.tryLock(10, TimeUnit.SECONDS)) {
         try {
-          logger.info("I'm going to use the toilet");
+          log("I'm going to use the toilet");
           sleep(Duration.ofSeconds(1L));
-          logger.info("I'm done with the toilet");
+          log("I'm done with the toilet");
         } finally {
           lock.unlock();
         }
