@@ -16,7 +16,7 @@ public class App {
   static final Logger logger = LoggerFactory.getLogger(App.class);
 
   public static void main(String[] args) {
-    twoEmployeesInTheOfficeWithLock();
+    virtualThreadLocal();
   }
 
   private static void stackOverFlowErrorExample() {
@@ -232,5 +232,39 @@ public class App {
 
   static void log(String message) {
     logger.info("{} | " + message, Thread.currentThread());
+  }
+  
+  static ThreadLocal<String> context = new ThreadLocal<>();
+  
+  @SneakyThrows
+  static void platformThreadLocal() {
+    var thread1 = Thread.ofPlatform().name("thread-1").start(() -> {
+      context.set("thread-1");
+      sleep(Duration.ofSeconds(1L));
+      log("Hey, my name is " + context.get());
+    });
+    var thread2 = Thread.ofPlatform().name("thread-2").start(() -> {
+      context.set("thread-2");
+      sleep(Duration.ofSeconds(1L));
+      log("Hey, my name is " + context.get());
+    });
+    thread1.join();
+    thread2.join();
+  }
+  
+  @SneakyThrows
+  static void virtualThreadLocal() {
+    var virtualThread1 = Thread.ofVirtual().name("thread-1").start(() -> {
+      context.set("thread-1");
+      sleep(Duration.ofSeconds(1L));
+      log("Hey, my name is " + context.get());
+    });
+    var virtualThread2 = Thread.ofVirtual().name("thread-2").start(() -> {
+      context.set("thread-2");
+      sleep(Duration.ofSeconds(1L));
+      log("Hey, my name is " + context.get());
+    });
+    virtualThread1.join();
+    virtualThread2.join();
   }
 }
