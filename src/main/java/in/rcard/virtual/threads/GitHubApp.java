@@ -105,16 +105,15 @@ public class GitHubApp {
       this.findRepositoriesByUserIdPort = findRepositoriesByUserIdPort;
     }
 
-    //    @Override
-    //    public GitHubUser findGitHubUser(UserId userId) throws InterruptedException,
-    // ExecutionException {
-    //      try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-    //        var user = executor.submit(() -> findUserByIdPort.findUser(userId));
-    //        var repositories =
-    //                executor.submit(() -> findRepositoriesByUserIdPort.findRepositories(userId));
-    //        throw new RuntimeException("Something went wrong");
-    //      }
-    //    }
+//    @Override
+//    public GitHubUser findGitHubUser(UserId userId) throws InterruptedException, ExecutionException {
+//      try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+//        var user = executor.submit(() -> findUserByIdPort.findUser(userId));
+//        var repositories =
+//                executor.submit(() -> findRepositoriesByUserIdPort.findRepositories(userId));
+//        throw new RuntimeException("Something went wrong");
+//      }
+//    }
 
     @Override
     public GitHubUser findGitHubUser(UserId userId)
