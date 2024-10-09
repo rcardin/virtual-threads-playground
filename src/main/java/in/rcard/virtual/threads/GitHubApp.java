@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructuredTaskScope.Subtask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +61,12 @@ public class GitHubApp {
               "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
-//    @Override
-//    public User findUser(UserId userId) throws InterruptedException {
-//      LOGGER.info("Finding user with id '{}'", userId);
-//      delay(Duration.ofMillis(100L));
-//      throw new RuntimeException("Socket timeout");
-//    }
+    //    @Override
+    //    public User findUser(UserId userId) throws InterruptedException {
+    //      LOGGER.info("Finding user with id '{}'", userId);
+    //      delay(Duration.ofMillis(100L));
+    //      throw new RuntimeException("Socket timeout");
+    //    }
   }
 
   private static void delay(Duration duration) throws InterruptedException {
@@ -105,15 +107,16 @@ public class GitHubApp {
       this.findRepositoriesByUserIdPort = findRepositoriesByUserIdPort;
     }
 
-//    @Override
-//    public GitHubUser findGitHubUser(UserId userId) throws InterruptedException, ExecutionException {
-//      try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-//        var user = executor.submit(() -> findUserByIdPort.findUser(userId));
-//        var repositories =
-//                executor.submit(() -> findRepositoriesByUserIdPort.findRepositories(userId));
-//        throw new RuntimeException("Something went wrong");
-//      }
-//    }
+    //    @Override
+    //    public GitHubUser findGitHubUser(UserId userId) throws InterruptedException,
+    // ExecutionException {
+    //      try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    //        var user = executor.submit(() -> findUserByIdPort.findUser(userId));
+    //        var repositories =
+    //                executor.submit(() -> findRepositoriesByUserIdPort.findRepositories(userId));
+    //        throw new RuntimeException("Something went wrong");
+    //      }
+    //    }
 
     @Override
     public GitHubUser findGitHubUser(UserId userId)
@@ -122,6 +125,34 @@ public class GitHubApp {
         var user = executor.submit(() -> findUserByIdPort.findUser(userId));
         var repositories =
             executor.submit(() -> findRepositoriesByUserIdPort.findRepositories(userId));
+        return new GitHubUser(user.get(), repositories.get());
+      }
+    }
+  }
+
+  @SuppressWarnings("preview")
+  static class FindGitHubUserStructuredConcurrencyService implements FindGitHubUserUseCase {
+
+    private final FindUserByIdPort findUserByIdPort;
+    private final FindRepositoriesByUserIdPort findRepositoriesByUserIdPort;
+
+    FindGitHubUserStructuredConcurrencyService(
+        FindUserByIdPort findUserByIdPort,
+        FindRepositoriesByUserIdPort findRepositoriesByUserIdPort) {
+      this.findUserByIdPort = findUserByIdPort;
+      this.findRepositoriesByUserIdPort = findRepositoriesByUserIdPort;
+    }
+
+    @Override
+    public GitHubUser findGitHubUser(UserId userId) throws ExecutionException {
+
+      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+        final Subtask<User> user = scope.fork(() -> findUserByIdPort.findUser(userId));
+        final Subtask<List<Repository>> repositories =
+            scope.fork(() -> findRepositoriesByUserIdPort.findRepositories(userId));
+
+        scope.throwIfFailed();
+
         return new GitHubUser(user.get(), repositories.get());
       }
     }
