@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
-import java.util.concurrent.StructuredTaskScope.Subtask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,14 +143,13 @@ public class GitHubApp {
     }
 
     @Override
-    public GitHubUser findGitHubUser(UserId userId) throws ExecutionException {
+    public GitHubUser findGitHubUser(UserId userId) throws ExecutionException, InterruptedException {
 
-      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-        final Subtask<User> user = scope.fork(() -> findUserByIdPort.findUser(userId));
-        final Subtask<List<Repository>> repositories =
-            scope.fork(() -> findRepositoriesByUserIdPort.findRepositories(userId));
+      try (var scope = new StructuredTaskScope<>()) {
+        var user = scope.fork(() -> findUserByIdPort.findUser(userId));
+        var repositories = scope.fork(() -> findRepositoriesByUserIdPort.findRepositories(userId));
 
-        scope.throwIfFailed();
+        scope.join();
 
         return new GitHubUser(user.get(), repositories.get());
       }
@@ -161,7 +159,7 @@ public class GitHubApp {
   public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
     FindGitHubUserUseCase service =
-        new FindGitHubUserConcurrentService(gitHubRepository, gitHubRepository);
+        new FindGitHubUserStructuredConcurrencyService(gitHubRepository, gitHubRepository);
 
     final GitHubUser gitHubUser = service.findGitHubUser(new UserId(1L));
     LOGGER.info("GitHub user: {}", gitHubUser);
