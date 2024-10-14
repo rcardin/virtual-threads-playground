@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.function.Function;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,14 +43,6 @@ public class GitHubApp {
   static class GitHubRepository implements FindUserByIdPort, FindRepositoriesByUserIdPort {
 
     @Override
-    public User findUser(UserId userId) throws InterruptedException {
-      LOGGER.info("Finding user with id '{}'", userId);
-      delay(Duration.ofMillis(500L));
-      LOGGER.info("User '{}' found", userId);
-      return new User(userId, new UserName("rcardin"), new Email("rcardin@rockthejvm.com"));
-    }
-
-    @Override
     public List<Repository> findRepositories(UserId userId) throws InterruptedException {
       LOGGER.info("Finding repositories for user with id '{}'", userId);
       delay(Duration.ofSeconds(1L));
@@ -60,12 +54,21 @@ public class GitHubApp {
               "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
-    //    @Override
-    //    public User findUser(UserId userId) throws InterruptedException {
-    //      LOGGER.info("Finding user with id '{}'", userId);
-    //      delay(Duration.ofMillis(100L));
-    //      throw new RuntimeException("Socket timeout");
-    //    }
+    //        @Override
+    //        public User findUser(UserId userId) throws InterruptedException {
+    //          LOGGER.info("Finding user with id '{}'", userId);
+    //          delay(Duration.ofMillis(500L));
+    //          LOGGER.info("User '{}' found", userId);
+    //          return new User(userId, new UserName("rcardin"), new
+    // Email("rcardin@rockthejvm.com"));
+    //        }
+
+    @Override
+    public User findUser(UserId userId) throws InterruptedException {
+      LOGGER.info("Finding user with id '{}'", userId);
+      delay(Duration.ofMillis(100L));
+      throw new RuntimeException("Socket timeout");
+    }
   }
 
   private static void delay(Duration duration) throws InterruptedException {
@@ -73,7 +76,7 @@ public class GitHubApp {
   }
 
   interface FindGitHubUserUseCase {
-    GitHubUser findGitHubUser(UserId userId) throws InterruptedException, ExecutionException;
+    GitHubUser findGitHubUser(UserId userId) throws Throwable;
   }
 
   static class FindGitHubUserSequentialService implements FindGitHubUserUseCase {
@@ -143,20 +146,23 @@ public class GitHubApp {
     }
 
     @Override
-    public GitHubUser findGitHubUser(UserId userId) throws ExecutionException, InterruptedException {
+    public GitHubUser findGitHubUser(UserId userId)
+        throws Throwable {
 
-      try (var scope = new StructuredTaskScope<>()) {
+      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
         var user = scope.fork(() -> findUserByIdPort.findUser(userId));
         var repositories = scope.fork(() -> findRepositoriesByUserIdPort.findRepositories(userId));
 
-        scope.join();
+        LOGGER.info("Both forked task completed");
+
+        scope.join().throwIfFailed(Function.identity());
 
         return new GitHubUser(user.get(), repositories.get());
       }
     }
   }
 
-  public static void main() throws ExecutionException, InterruptedException {
+  public static void main() throws Throwable {
     final GitHubRepository gitHubRepository = new GitHubRepository();
     FindGitHubUserUseCase service =
         new FindGitHubUserStructuredConcurrencyService(gitHubRepository, gitHubRepository);
