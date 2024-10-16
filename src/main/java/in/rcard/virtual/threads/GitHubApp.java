@@ -237,12 +237,14 @@ public class GitHubApp {
     }
   }
 
-  public static void main() throws Throwable {
+  public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
-    FindGitHubUserUseCase service =
-        new FindGitHubUserStructuredConcurrencyService(gitHubRepository, gitHubRepository);
+    final FindRepositoriesByUserIdCache cache = new FindRepositoriesByUserIdCache();
+    final FindRepositoriesByUserIdPort gitHubCachedRepository =
+        new GitHubCachedRepository(gitHubRepository, cache);
 
-    final GitHubUser gitHubUser = service.findGitHubUser(new UserId(1L));
-    LOGGER.info("GitHub user: {}", gitHubUser);
+    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(1L));
+
+    LOGGER.info("GitHub user's repositories: {}", repositories);
   }
 }
