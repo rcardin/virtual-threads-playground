@@ -48,6 +48,16 @@ public class GitHubApp {
 
     private final Map<UserId, List<Repository>> cache = new HashMap<>();
 
+    public FindRepositoriesByUserIdCache() {
+      cache.put(
+          new UserId(42L),
+          List.of(
+              new Repository(
+                  "rockthejvm.github.io",
+                  Visibility.PUBLIC,
+                  URI.create("https://github.com/rockthejvm/rockthejvm.github.io"))));
+    }
+
     @Override
     public List<Repository> findRepositories(UserId userId) throws InterruptedException {
       // Simulates access to a distributed cache (Redis?)
@@ -243,7 +253,7 @@ public class GitHubApp {
     final FindRepositoriesByUserIdPort gitHubCachedRepository =
         new GitHubCachedRepository(gitHubRepository, cache);
 
-    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(1L));
+    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(42L));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
