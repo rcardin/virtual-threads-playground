@@ -2,15 +2,18 @@ package in.rcard.virtual.threads;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("preview")
 public class GitHubApp {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("GitHubApp");
@@ -37,7 +40,60 @@ public class GitHubApp {
   }
 
   interface FindRepositoriesByUserIdPort {
-    List<Repository> findRepositories(UserId userId) throws InterruptedException;
+    List<Repository> findRepositories(UserId userId)
+        throws InterruptedException, ExecutionException;
+  }
+
+  static class FindRepositoriesByUserIdCache implements FindRepositoriesByUserIdPort {
+
+    private final Map<UserId, List<Repository>> cache = new HashMap<>();
+
+    @Override
+    public List<Repository> findRepositories(UserId userId) throws InterruptedException {
+      // Simulates access to a distributed cache (Redis?)
+      delay(Duration.ofMillis(100L));
+      final List<Repository> repositories = cache.get(userId);
+      if (repositories == null) {
+        LOGGER.info("No cached repositories found for user with id '{}'", userId);
+        throw new NoSuchElementException(
+            "No cached repositories found for user with id '%s'".formatted(userId));
+      }
+      return repositories;
+    }
+
+    public void addToCache(UserId userId, List<Repository> repositories)
+        throws InterruptedException {
+      // Simulates access to a distributed cache (Redis?)
+      delay(Duration.ofMillis(100L));
+      cache.put(userId, repositories);
+    }
+  }
+
+  static class GitHubCachedRepository implements FindRepositoriesByUserIdPort {
+
+    private final FindRepositoriesByUserIdPort repository;
+    private final FindRepositoriesByUserIdCache cache;
+
+    GitHubCachedRepository(
+        FindRepositoriesByUserIdPort repository, FindRepositoriesByUserIdCache cache) {
+      this.repository = repository;
+      this.cache = cache;
+    }
+
+    @Override
+    public List<Repository> findRepositories(UserId userId)
+        throws InterruptedException, ExecutionException {
+      try (var scope = new StructuredTaskScope.ShutdownOnSuccess<List<Repository>>()) {
+        scope.fork(() -> cache.findRepositories(userId));
+        scope.fork(
+            () -> {
+              final List<Repository> repositories = repository.findRepositories(userId);
+              cache.addToCache(userId, repositories);
+              return repositories;
+            });
+        return scope.join().result();
+      }
+    }
   }
 
   static class GitHubRepository implements FindUserByIdPort, FindRepositoriesByUserIdPort {
@@ -91,7 +147,8 @@ public class GitHubApp {
     }
 
     @Override
-    public GitHubUser findGitHubUser(UserId userId) throws InterruptedException {
+    public GitHubUser findGitHubUser(UserId userId)
+        throws InterruptedException, ExecutionException {
       var user = findUserByIdPort.findUser(userId);
       var repositories = findRepositoriesByUserIdPort.findRepositories(userId);
       return new GitHubUser(user, repositories);
@@ -132,7 +189,6 @@ public class GitHubApp {
     }
   }
 
-  @SuppressWarnings("preview")
   static class FindGitHubUserStructuredConcurrencyService implements FindGitHubUserUseCase {
 
     private final FindUserByIdPort findUserByIdPort;
@@ -146,7 +202,8 @@ public class GitHubApp {
     }
 
     @Override
-    public GitHubUser findGitHubUser(UserId userId) throws Throwable {
+    public GitHubUser findGitHubUser(UserId userId)
+        throws ExecutionException, InterruptedException {
 
       var result =
           par(
@@ -166,17 +223,17 @@ public class GitHubApp {
       //        return new GitHubUser(user.get(), repositories.get());
       //      }
     }
+  }
 
-    public record Pair<T1, T2>(T1 first, T2 second) {}
+  public record Pair<T1, T2>(T1 first, T2 second) {}
 
-    public <T1, T2> Pair<T1, T2> par(Callable<T1> first, Callable<T2> second)
-        throws InterruptedException, ExecutionException {
-      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-        var firstTask = scope.fork(first);
-        var secondTask = scope.fork(second);
-        scope.join().throwIfFailed();
-        return new Pair<>(firstTask.get(), secondTask.get());
-      }
+  public static <T1, T2> Pair<T1, T2> par(Callable<T1> first, Callable<T2> second)
+      throws InterruptedException, ExecutionException {
+    try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+      var firstTask = scope.fork(first);
+      var secondTask = scope.fork(second);
+      scope.join().throwIfFailed();
+      return new Pair<>(firstTask.get(), secondTask.get());
     }
   }
 
