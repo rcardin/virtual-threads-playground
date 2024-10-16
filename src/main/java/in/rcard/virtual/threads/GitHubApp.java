@@ -3,11 +3,11 @@ package in.rcard.virtual.threads;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
 import java.util.function.Function;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,18 +146,36 @@ public class GitHubApp {
     }
 
     @Override
-    public GitHubUser findGitHubUser(UserId userId)
-        throws Throwable {
+    public GitHubUser findGitHubUser(UserId userId) throws Throwable {
 
+      var result =
+          par(
+              () -> findUserByIdPort.findUser(userId),
+              () -> findRepositoriesByUserIdPort.findRepositories(userId));
+      return new GitHubUser(result.first(), result.second());
+
+      //      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+      //        var user = scope.fork(() -> findUserByIdPort.findUser(userId));
+      //        var repositories = scope.fork(() ->
+      // findRepositoriesByUserIdPort.findRepositories(userId));
+      //
+      //        LOGGER.info("Both forked task completed");
+      //
+      //        scope.join().throwIfFailed(Function.identity());
+      //
+      //        return new GitHubUser(user.get(), repositories.get());
+      //      }
+    }
+
+    public record Pair<T1, T2>(T1 first, T2 second) {}
+
+    public <T1, T2> Pair<T1, T2> par(Callable<T1> first, Callable<T2> second)
+        throws InterruptedException, ExecutionException {
       try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-        var user = scope.fork(() -> findUserByIdPort.findUser(userId));
-        var repositories = scope.fork(() -> findRepositoriesByUserIdPort.findRepositories(userId));
-
-        LOGGER.info("Both forked task completed");
-
-        scope.join().throwIfFailed(Function.identity());
-
-        return new GitHubUser(user.get(), repositories.get());
+        var firstTask = scope.fork(first);
+        var secondTask = scope.fork(second);
+        scope.join().throwIfFailed();
+        return new Pair<>(firstTask.get(), secondTask.get());
       }
     }
   }
