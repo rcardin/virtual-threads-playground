@@ -112,12 +112,13 @@ public class GitHubApp {
     public List<Repository> findRepositories(UserId userId) throws InterruptedException {
       LOGGER.info("Finding repositories for user with id '{}'", userId);
       delay(Duration.ofSeconds(1L));
-      LOGGER.info("Repositories found for user '{}'", userId);
-      return List.of(
-          new Repository(
-              "raise4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/raise4s")),
-          new Repository(
-              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
+      throw new RuntimeException("Socket timeout");
+//      LOGGER.info("Repositories found for user '{}'", userId);
+//      return List.of(
+//          new Repository(
+//              "raise4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/raise4s")),
+//          new Repository(
+//              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
     //        @Override
@@ -253,7 +254,7 @@ public class GitHubApp {
     final FindRepositoriesByUserIdPort gitHubCachedRepository =
         new GitHubCachedRepository(gitHubRepository, cache);
 
-    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(42L));
+    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(1L));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
