@@ -93,16 +93,25 @@ public class GitHubApp {
     @Override
     public List<Repository> findRepositories(UserId userId)
         throws InterruptedException, ExecutionException {
-      try (var scope = new StructuredTaskScope.ShutdownOnSuccess<List<Repository>>()) {
-        scope.fork(() -> cache.findRepositories(userId));
-        scope.fork(
-            () -> {
-              final List<Repository> repositories = repository.findRepositories(userId);
-              cache.addToCache(userId, repositories);
-              return repositories;
-            });
-        return scope.join().result();
-      }
+
+      return raceAll(
+          () -> cache.findRepositories(userId),
+          () -> {
+            final List<Repository> repositories = repository.findRepositories(userId);
+            cache.addToCache(userId, repositories);
+            return repositories;
+          });
+
+//      try (var scope = new StructuredTaskScope.ShutdownOnSuccess<List<Repository>>()) {
+//        scope.fork(() -> cache.findRepositories(userId));
+//        scope.fork(
+//            () -> {
+//              final List<Repository> repositories = repository.findRepositories(userId);
+//              cache.addToCache(userId, repositories);
+//              return repositories;
+//            });
+//        return scope.join().result();
+//      }
     }
   }
 
@@ -113,12 +122,13 @@ public class GitHubApp {
       LOGGER.info("Finding repositories for user with id '{}'", userId);
       delay(Duration.ofSeconds(1L));
       throw new RuntimeException("Socket timeout");
-//      LOGGER.info("Repositories found for user '{}'", userId);
-//      return List.of(
-//          new Repository(
-//              "raise4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/raise4s")),
-//          new Repository(
-//              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
+      //      LOGGER.info("Repositories found for user '{}'", userId);
+      //      return List.of(
+      //          new Repository(
+      //              "raise4s", Visibility.PUBLIC,
+      // URI.create("https://github.com/rcardin/raise4s")),
+      //          new Repository(
+      //              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
     //        @Override
@@ -236,9 +246,9 @@ public class GitHubApp {
     }
   }
 
-  public record Pair<T1, T2>(T1 first, T2 second) {}
+  record Pair<T1, T2>(T1 first, T2 second) {}
 
-  public static <T1, T2> Pair<T1, T2> par(Callable<T1> first, Callable<T2> second)
+  static <T1, T2> Pair<T1, T2> par(Callable<T1> first, Callable<T2> second)
       throws InterruptedException, ExecutionException {
     try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
       var firstTask = scope.fork(first);
@@ -248,13 +258,22 @@ public class GitHubApp {
     }
   }
 
+  static <T> T raceAll(Callable<T> first, Callable<T> second)
+      throws InterruptedException, ExecutionException {
+    try (var scope = new StructuredTaskScope.ShutdownOnSuccess<T>()) {
+      scope.fork(first);
+      scope.fork(second);
+      return scope.join().result();
+    }
+  }
+
   public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
     final FindRepositoriesByUserIdCache cache = new FindRepositoriesByUserIdCache();
     final FindRepositoriesByUserIdPort gitHubCachedRepository =
         new GitHubCachedRepository(gitHubRepository, cache);
 
-    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(1L));
+    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(42L));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
