@@ -6,10 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +41,36 @@ public class GitHubApp {
   interface FindRepositoriesByUserIdPort {
     List<Repository> findRepositories(UserId userId)
         throws InterruptedException, ExecutionException;
+  }
+
+  static class FindRepositoriesByUserIdWithTimeout
+      implements GitHubApp.FindRepositoriesByUserIdPort {
+
+    final FindRepositoriesByUserIdPort delegate;
+
+    FindRepositoriesByUserIdWithTimeout(FindRepositoriesByUserIdPort delegate) {
+      this.delegate = delegate;
+    }
+
+    List<Repository> findRepositories(UserId userId, Duration timeout)
+        throws InterruptedException, ExecutionException {
+
+      try (var scope = new ShutdownOnResult<List<Repository>>()) {
+        scope.fork(() -> delegate.findRepositories(userId));
+        scope.fork(
+            () -> {
+              delay(timeout);
+              throw new TimeoutException("Timeout of %s reached".formatted(timeout));
+            });
+        return scope.join().resultOrThrow();
+      }
+    }
+
+    @Override
+    public List<Repository> findRepositories(UserId userId)
+        throws InterruptedException, ExecutionException {
+      return delegate.findRepositories(userId);
+    }
   }
 
   static class FindRepositoriesByUserIdCache implements FindRepositoriesByUserIdPort {
@@ -102,16 +131,16 @@ public class GitHubApp {
             return repositories;
           });
 
-//      try (var scope = new StructuredTaskScope.ShutdownOnSuccess<List<Repository>>()) {
-//        scope.fork(() -> cache.findRepositories(userId));
-//        scope.fork(
-//            () -> {
-//              final List<Repository> repositories = repository.findRepositories(userId);
-//              cache.addToCache(userId, repositories);
-//              return repositories;
-//            });
-//        return scope.join().result();
-//      }
+      //      try (var scope = new StructuredTaskScope.ShutdownOnSuccess<List<Repository>>()) {
+      //        scope.fork(() -> cache.findRepositories(userId));
+      //        scope.fork(
+      //            () -> {
+      //              final List<Repository> repositories = repository.findRepositories(userId);
+      //              cache.addToCache(userId, repositories);
+      //              return repositories;
+      //            });
+      //        return scope.join().result();
+      //      }
     }
   }
 
@@ -121,14 +150,13 @@ public class GitHubApp {
     public List<Repository> findRepositories(UserId userId) throws InterruptedException {
       LOGGER.info("Finding repositories for user with id '{}'", userId);
       delay(Duration.ofSeconds(1L));
-      throw new RuntimeException("Socket timeout");
-      //      LOGGER.info("Repositories found for user '{}'", userId);
-      //      return List.of(
-      //          new Repository(
-      //              "raise4s", Visibility.PUBLIC,
-      // URI.create("https://github.com/rcardin/raise4s")),
-      //          new Repository(
-      //              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
+      //      throw new RuntimeException("Socket timeout");
+      LOGGER.info("Repositories found for user '{}'", userId);
+      return List.of(
+          new Repository(
+              "raise4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/raise4s")),
+          new Repository(
+              "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
     //        @Override
@@ -267,13 +295,62 @@ public class GitHubApp {
     }
   }
 
+  static class ShutdownOnResult<T> extends StructuredTaskScope<T> {
+
+    private final Lock lock = new ReentrantLock();
+    private T firstResult;
+    private Throwable firstException;
+
+    @Override
+    protected void handleComplete(Subtask<? extends T> subtask) {
+      switch (subtask.state()) {
+        case FAILED -> {
+          lock.lock();
+          try {
+            if (firstException == null) {
+              firstException = subtask.exception();
+              shutdown();
+            }
+          } finally {
+            lock.unlock();
+          }
+        }
+        case SUCCESS -> {
+          lock.lock();
+          try {
+            if (firstResult == null) {
+              firstResult = subtask.get();
+              shutdown();
+            }
+          } finally {
+            lock.unlock();
+          }
+        }
+        case UNAVAILABLE -> super.handleComplete(subtask);
+      }
+    }
+
+    @Override
+    public ShutdownOnResult<T> join() throws InterruptedException {
+      super.join();
+      return this;
+    }
+
+    public T resultOrThrow() throws ExecutionException {
+      if (firstException != null) {
+        throw new ExecutionException(firstException);
+      }
+      return firstResult;
+    }
+  }
+
   public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
-    final FindRepositoriesByUserIdCache cache = new FindRepositoriesByUserIdCache();
-    final FindRepositoriesByUserIdPort gitHubCachedRepository =
-        new GitHubCachedRepository(gitHubRepository, cache);
+    final FindRepositoriesByUserIdWithTimeout findRepositoriesWithTimeout =
+        new FindRepositoriesByUserIdWithTimeout(gitHubRepository);
 
-    final List<Repository> repositories = gitHubCachedRepository.findRepositories(new UserId(42L));
+    final List<Repository> repositories =
+        findRepositoriesWithTimeout.findRepositories(new UserId(1L), Duration.ofMillis(200L));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
