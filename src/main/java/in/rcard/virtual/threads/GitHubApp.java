@@ -344,6 +344,25 @@ public class GitHubApp {
     }
   }
 
+  static <T> T race(Callable<T> first, Callable<T> second)
+      throws InterruptedException, ExecutionException {
+    try (var scope = new ShutdownOnResult<T>()) {
+      scope.fork(first);
+      scope.fork(second);
+      return scope.join().resultOrThrow();
+    }
+  }
+
+  static <T> T timeout(Duration timeout, Callable<T> task)
+      throws InterruptedException, ExecutionException {
+    return race(
+        task,
+        () -> {
+          delay(timeout);
+          throw new TimeoutException("Timeout of %s reached".formatted(timeout));
+        });
+  }
+
   public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
     final FindRepositoriesByUserIdWithTimeout findRepositoriesWithTimeout =
