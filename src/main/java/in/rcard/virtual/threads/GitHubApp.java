@@ -43,8 +43,7 @@ public class GitHubApp {
         throws InterruptedException, ExecutionException;
   }
 
-  static class FindRepositoriesByUserIdWithTimeout
-      implements GitHubApp.FindRepositoriesByUserIdPort {
+  static class FindRepositoriesByUserIdWithTimeout {
 
     final FindRepositoriesByUserIdPort delegate;
 
@@ -64,12 +63,6 @@ public class GitHubApp {
             });
         return scope.join().resultOrThrow();
       }
-    }
-
-    @Override
-    public List<Repository> findRepositories(UserId userId)
-        throws InterruptedException, ExecutionException {
-      return delegate.findRepositories(userId);
     }
   }
 
@@ -365,11 +358,9 @@ public class GitHubApp {
 
   public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
-    final FindRepositoriesByUserIdWithTimeout findRepositoriesWithTimeout =
-        new FindRepositoriesByUserIdWithTimeout(gitHubRepository);
 
     final List<Repository> repositories =
-        findRepositoriesWithTimeout.findRepositories(new UserId(1L), Duration.ofMillis(200L));
+        timeout(Duration.ofMillis(500L), () -> gitHubRepository.findRepositories(new UserId(1L)));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
