@@ -2,6 +2,7 @@ package in.rcard.virtual.threads;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -356,11 +357,20 @@ public class GitHubApp {
         });
   }
 
-  public static void main() throws ExecutionException, InterruptedException {
+  static <T> T timeout2(Duration timeout, Callable<T> task)
+      throws InterruptedException, TimeoutException {
+    try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+      var result = scope.fork(task);
+      scope.joinUntil(Instant.now().plus(timeout));
+      return result.get();
+    }
+  }
+
+  public static void main() throws ExecutionException, InterruptedException, TimeoutException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
 
     final List<Repository> repositories =
-        timeout(Duration.ofMillis(500L), () -> gitHubRepository.findRepositories(new UserId(1L)));
+        timeout2(Duration.ofMillis(500L), () -> gitHubRepository.findRepositories(new UserId(1L)));
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
