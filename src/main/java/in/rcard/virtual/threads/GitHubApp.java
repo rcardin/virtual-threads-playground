@@ -366,11 +366,40 @@ public class GitHubApp {
     }
   }
 
-  public static void main() throws ExecutionException, InterruptedException, TimeoutException {
+  record Bitcoin(String hash) {}
+
+  static Bitcoin mineBitcoin() {
+    LOGGER.info("Mining Bitcoin...");
+    while (alwaysTrue()) {
+      // Empty body
+    }
+    LOGGER.info("Bitcoin mined!");
+    return new Bitcoin("bitcoin-hash");
+  }
+
+  static Bitcoin mineBitcoinWithConsciousness() {
+    LOGGER.info("Mining Bitcoin...");
+    while (alwaysTrue()) {
+      if (Thread.currentThread().isInterrupted()) {
+        LOGGER.info("Bitcoin mining interrupted");
+        return null;
+      }
+    }
+    LOGGER.info("Bitcoin mined!");
+    return new Bitcoin("bitcoin-hash");
+  }
+
+  private static boolean alwaysTrue() {
+    return true;
+  }
+
+  public static void main() throws ExecutionException, InterruptedException {
     final GitHubRepository gitHubRepository = new GitHubRepository();
 
-    final List<Repository> repositories =
-        timeout2(Duration.ofMillis(500L), () -> gitHubRepository.findRepositories(new UserId(1L)));
+    var repositories = race(
+            () -> gitHubRepository.findRepositories(new UserId(42L)),
+            () -> mineBitcoinWithConsciousness()
+    );
 
     LOGGER.info("GitHub user's repositories: {}", repositories);
   }
