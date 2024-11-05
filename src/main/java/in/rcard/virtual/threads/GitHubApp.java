@@ -3,13 +3,11 @@ package in.rcard.virtual.threads;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,21 +151,20 @@ public class GitHubApp {
               "sus4s", Visibility.PUBLIC, URI.create("https://github.com/rcardin/sus4s")));
     }
 
-    //        @Override
-    //        public User findUser(UserId userId) throws InterruptedException {
-    //          LOGGER.info("Finding user with id '{}'", userId);
-    //          delay(Duration.ofMillis(500L));
-    //          LOGGER.info("User '{}' found", userId);
-    //          return new User(userId, new UserName("rcardin"), new
-    // Email("rcardin@rockthejvm.com"));
-    //        }
-
     @Override
     public User findUser(UserId userId) throws InterruptedException {
       LOGGER.info("Finding user with id '{}'", userId);
-      delay(Duration.ofMillis(100L));
-      throw new RuntimeException("Socket timeout");
+      delay(Duration.ofMillis(500L));
+      LOGGER.info("User '{}' found", userId);
+      return new User(userId, new UserName("rcardin"), new Email("rcardin@rockthejvm.com"));
     }
+
+    //    @Override
+    //    public User findUser(UserId userId) throws InterruptedException {
+    //      LOGGER.info("Finding user with id '{}'", userId);
+    //      delay(Duration.ofMillis(100L));
+    //      throw new RuntimeException("Socket timeout");
+    //    }
   }
 
   private static void delay(Duration duration) throws InterruptedException {
@@ -176,6 +173,9 @@ public class GitHubApp {
 
   interface FindGitHubUserUseCase {
     GitHubUser findGitHubUser(UserId userId) throws Throwable;
+
+    List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+        throws InterruptedException, ExecutionException;
   }
 
   static class FindGitHubUserSequentialService implements FindGitHubUserUseCase {
@@ -195,6 +195,11 @@ public class GitHubApp {
       var user = findUserByIdPort.findUser(userId);
       var repositories = findRepositoriesByUserIdPort.findRepositories(userId);
       return new GitHubUser(user, repositories);
+    }
+
+    @Override
+    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout) {
+      return List.of();
     }
   }
 
@@ -230,6 +235,12 @@ public class GitHubApp {
         return new GitHubUser(user.get(), repositories.get());
       }
     }
+
+    @Override
+    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+        throws InterruptedException, ExecutionException {
+      return List.of();
+    }
   }
 
   static class FindGitHubUserStructuredConcurrencyService implements FindGitHubUserUseCase {
@@ -254,17 +265,37 @@ public class GitHubApp {
               () -> findRepositoriesByUserIdPort.findRepositories(userId));
       return new GitHubUser(result.first(), result.second());
 
-      //      try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+      //      try (var scope = new StructuredTaskScope<>()) {
       //        var user = scope.fork(() -> findUserByIdPort.findUser(userId));
       //        var repositories = scope.fork(() ->
       // findRepositoriesByUserIdPort.findRepositories(userId));
       //
       //        LOGGER.info("Both forked task completed");
       //
-      //        scope.join().throwIfFailed(Function.identity());
-      //
       //        return new GitHubUser(user.get(), repositories.get());
       //      }
+    }
+
+    @Override
+    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+        throws InterruptedException, ExecutionException {
+
+      return timeout(
+          timeout,
+          () ->
+              par(
+                  userIds.stream()
+                      .map(
+                          userId ->
+                              (Callable<GitHubUser>)
+                                  () -> {
+                                    try {
+                                      return findGitHubUser(userId);
+                                    } catch (ExecutionException | InterruptedException e) {
+                                      throw new RuntimeException(e);
+                                    }
+                                  })
+                      .toList()));
     }
   }
 
@@ -277,6 +308,14 @@ public class GitHubApp {
       var secondTask = scope.fork(second);
       scope.join().throwIfFailed();
       return new Pair<>(firstTask.get(), secondTask.get());
+    }
+  }
+
+  static <T> List<T> par(List<Callable<T>> tasks) throws InterruptedException, ExecutionException {
+    try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+      var subtasks = tasks.stream().map(scope::fork).toList();
+      scope.join().throwIfFailed();
+      return subtasks.stream().map(Supplier::get).toList();
     }
   }
 
@@ -394,13 +433,11 @@ public class GitHubApp {
   }
 
   public static void main() throws ExecutionException, InterruptedException {
-    final GitHubRepository gitHubRepository = new GitHubRepository();
 
-    var repositories = race(
-            () -> gitHubRepository.findRepositories(new UserId(42L)),
-            () -> mineBitcoinWithConsciousness()
-    );
+    var repository = new GitHubRepository();
+    var service = new FindGitHubUserStructuredConcurrencyService(repository, repository);
 
-    LOGGER.info("GitHub user's repositories: {}", repositories);
+    final List<GitHubUser> gitHubUsers =
+        service.findGitHubUsers(List.of(new UserId(42L), new UserId(1L)), Duration.ofMillis(700L));
   }
 }
