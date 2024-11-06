@@ -174,7 +174,7 @@ public class GitHubApp {
   interface FindGitHubUserUseCase {
     GitHubUser findGitHubUser(UserId userId) throws Throwable;
 
-    List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+    List<GitHubUser> findGitHubUsers(UserId first, UserId second, Duration timeout)
         throws InterruptedException, ExecutionException;
   }
 
@@ -198,7 +198,8 @@ public class GitHubApp {
     }
 
     @Override
-    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout) {
+    public List<GitHubUser> findGitHubUsers(UserId first, UserId second, Duration timeout)
+        throws InterruptedException, ExecutionException {
       return List.of();
     }
   }
@@ -237,7 +238,7 @@ public class GitHubApp {
     }
 
     @Override
-    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+    public List<GitHubUser> findGitHubUsers(UserId first, UserId second, Duration timeout)
         throws InterruptedException, ExecutionException {
       return List.of();
     }
@@ -277,25 +278,12 @@ public class GitHubApp {
     }
 
     @Override
-    public List<GitHubUser> findGitHubUsers(List<UserId> userIds, Duration timeout)
+    public List<GitHubUser> findGitHubUsers(UserId first, UserId second, Duration timeout)
         throws InterruptedException, ExecutionException {
 
-      return timeout(
-          timeout,
-          () ->
-              par(
-                  userIds.stream()
-                      .map(
-                          userId ->
-                              (Callable<GitHubUser>)
-                                  () -> {
-                                    try {
-                                      return findGitHubUser(userId);
-                                    } catch (ExecutionException | InterruptedException e) {
-                                      throw new RuntimeException(e);
-                                    }
-                                  })
-                      .toList()));
+      var gitHubUsers =
+          timeout(timeout, () -> par(() -> findGitHubUser(first), () -> findGitHubUser(second)));
+      return List.of(gitHubUsers.first, gitHubUsers.second);
     }
   }
 
@@ -370,6 +358,7 @@ public class GitHubApp {
     }
 
     public T resultOrThrow() throws ExecutionException {
+      ensureOwnerAndJoined();
       if (firstException != null) {
         throw new ExecutionException(firstException);
       }
@@ -438,6 +427,6 @@ public class GitHubApp {
     var service = new FindGitHubUserStructuredConcurrencyService(repository, repository);
 
     final List<GitHubUser> gitHubUsers =
-        service.findGitHubUsers(List.of(new UserId(42L), new UserId(1L)), Duration.ofMillis(700L));
+        service.findGitHubUsers(new UserId(42L), new UserId(1L), Duration.ofMillis(700L));
   }
 }
