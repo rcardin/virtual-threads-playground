@@ -3,8 +3,15 @@ package in.rcard.virtual.threads;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -405,12 +412,12 @@ public class GitHubApp {
     return new Bitcoin("bitcoin-hash");
   }
 
-  static Bitcoin mineBitcoinWithConsciousness() {
+  static Bitcoin mineBitcoinWithConsciousness() throws InterruptedException {
     LOGGER.info("Mining Bitcoin...");
     while (alwaysTrue()) {
       if (Thread.currentThread().isInterrupted()) {
         LOGGER.info("Bitcoin mining interrupted");
-        return null;
+        throw new InterruptedException();
       }
     }
     LOGGER.info("Bitcoin mined!");
@@ -423,10 +430,13 @@ public class GitHubApp {
 
   public static void main() throws ExecutionException, InterruptedException {
 
-    var repository = new GitHubRepository();
-    var service = new FindGitHubUserStructuredConcurrencyService(repository, repository);
+    final GitHubRepository gitHubRepository = new GitHubRepository();
 
-    final List<GitHubUser> gitHubUsers =
-        service.findGitHubUsers(new UserId(42L), new UserId(1L), Duration.ofMillis(700L));
+    var repositories = race(
+            () -> gitHubRepository.findRepositories(new UserId(42L)),
+            () -> mineBitcoinWithConsciousness()
+    );
+
+    LOGGER.info("GitHub user's repositories: {}", repositories);
   }
 }
